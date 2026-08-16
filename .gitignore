@@ -1,11 +1,22 @@
-# Generated audio
+# ==============================
+# Generated course files
+# ==============================
+
+txt/
+audio/
+subtitles/
+zip/
+
+# Generated audio / subtitles / packages
 *.mp3
-
-# Generated subtitles
-# 如果以后想把 SRT 也作为课程文件保存，可以删掉这一行
 *.srt
+*.zip
 
+
+# ==============================
 # Python
+# ==============================
+
 __pycache__/
 *.py[cod]
 
@@ -14,17 +25,26 @@ __pycache__/
 venv/
 env/
 
+
+# ==============================
 # Temporary files
+# ==============================
+
 *.tmp
 *.temp
 
+
+# ==============================
 # IDE
+# ==============================
+
 .vscode/
 .idea/
 
+
+# ==============================
 # OS
+# ==============================
+
 Thumbs.db
-.DS_Store*.zip
-*.zip
-*.zip
-*.zip
+.DS_Store
