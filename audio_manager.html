@@ -1,0 +1,827 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>German Mini Stories - LingQ Player</title>
+<style>
+*{
+    box-sizing:border-box;
+}
+html,body{
+    margin:0;
+    padding:0;
+    width:100%;
+    min-height:100%;
+}
+body{
+    background:#fafafa;
+    color:#252525;
+    font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",Arial,sans-serif;
+}
+header{
+    position:sticky;
+    top:0;
+    z-index:10;
+    background:rgba(255,255,255,.96);
+    backdrop-filter:blur(10px);
+    border-bottom:1px solid #ddd;
+    padding:12px 18px;
+    transition:opacity .2s ease,transform .2s ease;
+}
+.toolbar{
+    max-width:1000px;
+    margin:auto;
+    display:flex;
+    gap:8px;
+    align-items:center;
+    flex-wrap:wrap;
+}
+button,label{
+    border:1px solid #d0d0d0;
+    background:#f4f4f4;
+    border-radius:7px;
+    padding:8px 12px;
+    cursor:pointer;
+    font-size:14px;
+}
+button:hover,label:hover{
+    background:#e9e9e9;
+}
+select{
+    padding:8px;
+    border:1px solid #d0d0d0;
+    border-radius:7px;
+    background:white;
+    min-width:200px;
+}
+.status{
+    font-size:13px;
+    color:#777;
+    margin-left:auto;
+}
+.modeBtn{
+    font-weight:600;
+}
+.modeBtn.active{
+    background:#222;
+    color:white;
+    border-color:#222;
+}
+main{
+    max-width:780px;
+    margin:35px auto 140px;
+    padding:0 24px;
+}
+h1{
+    font-size:36px;
+    font-weight:400;
+    color:#aeb9c6;
+    line-height:1.25;
+    letter-spacing:-1.2px;
+    margin:0 0 46px;
+}
+/* 默认所有句子：颜色变浅/半透明，降低存在感 */
+.article p{
+    font-size:23px;
+    line-height:1.65;
+    font-weight:400;
+    letter-spacing:-.7px;
+    margin:0 0 18px;
+    padding:3px 0;
+    border-radius:8px;
+    color: #666666;               /* 未播放的句子用浅灰色 */
+    transition: all 0.25s ease;
+}
+
+/* 当前播放的句子：纯黑、加粗、文字清晰 */
+.article p.current{
+    color: #000000 !important;           /* 纯黑 */
+    font-weight: 700 !important;         /* 标准加粗 (700 刚刚好，不会糊字) */
+    font-size: 23px !important;          /* 保持原字号，不抖动 */
+    text-shadow: none !important;        /* 彻底取消描边 */
+}
+.article p:hover{
+    background:#f5f5f5;
+    cursor:pointer;
+}
+#empty{
+    color:#999;
+    text-align:center;
+    margin-top:80px;
+}
+.player{
+    position:fixed;
+    left:50%;
+    bottom:18px;
+    width:min(560px, calc(100% - 34px));
+    transform:translateX(-50%);
+    background:rgba(255,255,255,.98);
+    border:1px solid #edf0f3;
+    border-radius:24px;
+    box-shadow:0 12px 27px rgba(8,29,54,.14);
+    padding:16px 20px;
+    z-index:20;
+}
+.player-inner{
+    display:grid;
+    grid-template-columns:72px 1fr 52px;
+    grid-template-rows:15px 42px;
+    column-gap:14px;
+    row-gap:6px;
+    align-items:center;
+}
+#playBtn{
+    grid-row:1/3;
+    width:74px;
+    height:74px;
+    padding:0 0 0 4px;
+    border:0;
+    border-radius:50%;
+    background:#061b34;
+    color:#fff;
+    font-size:23px;
+    line-height:1;
+}
+#seek{
+    grid-column:2/4;
+    width:100%;
+    height:5px;
+    appearance:none;
+    border-radius:8px;
+    background:linear-gradient(to right,#00b53d 0%,#00b53d var(--progress,0%),#d8dde3 var(--progress,0%),#d8dde3 100%);
+    cursor:pointer;
+}
+#seek::-webkit-slider-thumb{
+    appearance:none;
+    width:14px;
+    height:14px;
+    border:0;
+    border-radius:50%;
+    background:#00ad39;
+}
+#seek::-moz-range-thumb{
+    width:14px;
+    height:14px;
+    border:0;
+    border-radius:50%;
+    background:#00ad39;
+}
+.time{
+    font:15px ui-monospace,SFMono-Regular,Consolas,monospace;
+    color:#0c2139;
+    white-space:nowrap;
+}
+.speed{
+    width:54px;
+    min-width:54px;
+    padding:5px 0;
+    border:0;
+    font-size:20px;
+    color:#526070;
+}
+.transport-controls{
+    display:flex;
+    align-items:center;
+    gap:18px;
+}
+.transport-btn,#subtitleDockBtn,#exitReaderBtn{
+    width:34px;
+    height:38px;
+    padding:0;
+    border:0;
+    background:transparent;
+    color:#091f38;
+    font-size:23px;
+    line-height:1;
+}
+#subtitleDockBtn,#exitReaderBtn{
+    width:56px;
+    height:56px;
+    border-radius:15px;
+    background:#f1f3f5;
+    font-size:20px;
+}
+#exitReaderBtn{
+    background:transparent;
+    font-size:30px;
+    font-weight:200;
+}
+#subtitleMode{
+    display:none;
+    position:fixed;
+    inset:0;
+    z-index:100;
+    background:#000;
+    color:#fff;
+}
+.subtitle-screen{
+    position:absolute;
+    inset:0;
+    display:flex;
+    align-items:center;
+    justify-content:center;
+    padding:60px 8vw 150px;
+    text-align:center;
+}
+#subtitleText{
+    max-width:1200px;
+    font-size:34px;
+    line-height:1.45;
+    font-weight:500;
+    color:#fff;
+    text-shadow:0 2px 4px rgba(0,0,0,.8);
+    transition:opacity .18s ease,transform .18s ease;
+}
+#subtitleText.fade{
+    opacity:.15;
+    transform:translateY(4px);
+}
+.subtitle-player{
+    position:absolute;
+    left:0;
+    right:0;
+    bottom:0;
+    padding:14px 24px 18px;
+    background:linear-gradient(to top,rgba(0,0,0,.95),rgba(0,0,0,.65),transparent);
+    opacity:0;
+    transition:opacity .2s;
+    z-index:110;
+}
+#subtitleMode:hover .subtitle-player{
+    opacity:1;
+}
+.subtitle-controls{
+    max-width:1200px;
+    margin:auto;
+    display:flex;
+    align-items:center;
+    gap:10px;
+}
+.subtitle-controls button{
+    background:#222;
+    border-color:#555;
+    color:#fff;
+}
+.subtitle-controls button:hover{
+    background:#444;
+}
+.subtitle-controls select{
+    background:#222;
+    color:#fff;
+    border-color:#555;
+}
+#subtitleSeek{
+    flex:1;
+}
+.subtitle-time{
+    font:13px monospace;
+    color:#ccc;
+    white-space:nowrap;
+}
+#closeSubtitle{
+    position:absolute;
+    top:20px;
+    right:24px;
+    z-index:120;
+    background:rgba(40,40,40,.8);
+    color:#fff;
+    border:1px solid #666;
+    font-size:16px;
+    opacity:0;
+    transition:opacity .2s;
+}
+#subtitleMode:hover #closeSubtitle{
+    opacity:1;
+}
+.subtitle-hint{
+    position:absolute;
+    top:22px;
+    left:50%;
+    transform:translateX(-50%);
+    color:#777;
+    font-size:13px;
+    opacity:.6;
+    pointer-events:none;
+}
+body.subtitle-active{
+    overflow:hidden;
+}
+@media(max-width:700px){
+    .article p{ font-size:24px; line-height:1.65; }
+    h1{ font-size:31px; letter-spacing:-.6px; margin-bottom:28px }
+    main{ margin:28px auto 180px; padding:0 20px }
+    .player{ bottom:9px; padding:20px 17px 15px; border-radius:25px }
+    .player-inner{ grid-template-columns:60px 1fr 45px; column-gap:12px; row-gap:5px }
+    #playBtn{ width:54px; height:54px; font-size:22px }
+    .transport-controls{ gap:14px }
+    .transport-btn{ font-size:24px }
+    .time{ font-size:14px }
+    #subtitleDockBtn,#exitReaderBtn{ width:42px; height:42px; font-size:20px }
+    #subtitleText{ font-size:24px; line-height:1.5; }
+    .subtitle-screen{ padding:40px 25px 130px; }
+    .status{ width:100%; margin-left:0; }
+    .subtitle-time{ display:none; }
+}
+</style>
+</head>
+<body>
+<header id="readerHeader">
+    <div class="toolbar">
+        <select id="courseSelect">
+            <option value="">加载课程中...</option>
+        </select>
+        <button id="loadBtn">
+            ▶ 加载课程
+        </button>
+        <button id="readerModeBtn" class="modeBtn active">
+            📖 阅读
+        </button>
+        <button id="subtitleModeBtn" class="modeBtn">
+            🎬 字幕
+        </button>
+        <span class="status" id="status">
+            准备就绪
+        </span>
+    </div>
+</header>
+<main id="readerMain">
+    <h1 id="title">
+        German Mini Stories
+    </h1>
+    <div class="article" id="article"></div>
+    <div id="empty">
+        请选择上面的课程，然后点击「▶ 加载课程」
+    </div>
+</main>
+<div class="player">
+    <div class="player-inner">
+        <button id="playBtn" disabled>
+            ▶
+        </button>
+        <input id="seek" type="range" min="0" max="1000" value="0" disabled>
+        <div class="transport-controls">
+            <span class="time" id="time">00:00 / 00:00</span>
+            <button class="transport-btn" id="rewindBtn" title="后退 5 秒" aria-label="后退 5 秒">↶</button>
+            <button class="transport-btn" id="forwardBtn" title="前进 5 秒" aria-label="前进 5 秒">↷</button>
+            <button class="transport-btn" id="repeatBtn" title="重播当前句" aria-label="重播当前句">⟳</button>
+            <select class="speed" id="speed" aria-label="播放速度">
+                <option value="0.75">0.75×</option>
+                <option value="0.9">0.9×</option>
+                <option value="1" selected>1×</option>
+                <option value="1.1">1.1×</option>
+                <option value="1.25">1.25×</option>
+                <option value="1.5">1.5×</option>
+            </select>
+        </div>
+        <div style="display:flex;align-items:center;gap:8px">
+            <button id="subtitleDockBtn" title="字幕模式" aria-label="字幕模式">▤</button>
+            <button id="exitReaderBtn" title="返回顶部" aria-label="返回顶部">×</button>
+        </div>
+    </div>
+</div>
+<div id="subtitleMode">
+    <div class="subtitle-hint">
+        F：全屏 · Esc：返回阅读
+    </div>
+    <button id="closeSubtitle">
+        ✕ 返回阅读
+    </button>
+    <div class="subtitle-screen">
+        <div id="subtitleText">
+            选择课程后开始播放
+        </div>
+    </div>
+    <div class="subtitle-player">
+        <div class="subtitle-controls">
+            <button id="subtitlePlayBtn">
+                ▶
+            </button>
+            <input id="subtitleSeek" type="range" min="0" max="1000" value="0">
+            <span class="subtitle-time" id="subtitleTime">
+                00:00 / 00:00
+            </span>
+            <select id="subtitleSpeed">
+                <option value="0.75">0.75×</option>
+                <option value="0.9">0.9×</option>
+                <option value="1" selected>1.0×</option>
+                <option value="1.1">1.1×</option>
+                <option value="1.25">1.25×</option>
+                <option value="1.5">1.5×</option>
+            </select>
+        </div>
+    </div>
+</div>
+<audio id="audio" preload="metadata"></audio>
+<script>
+let coursesList = [];
+let subtitles = [];
+let currentIndex = -1;
+let subtitleModeActive = false;
+
+const courseSelect = document.getElementById('courseSelect');
+const loadBtn = document.getElementById('loadBtn');
+const playBtn = document.getElementById('playBtn');
+const seek = document.getElementById('seek');
+const audio = document.getElementById('audio');
+const article = document.getElementById('article');
+const titleEl = document.getElementById('title');
+const statusEl = document.getElementById('status');
+const emptyEl = document.getElementById('empty');
+const timeEl = document.getElementById('time');
+const speedEl = document.getElementById('speed');
+const rewindBtn = document.getElementById('rewindBtn');
+const forwardBtn = document.getElementById('forwardBtn');
+const repeatBtn = document.getElementById('repeatBtn');
+const subtitleDockBtn = document.getElementById('subtitleDockBtn');
+const exitReaderBtn = document.getElementById('exitReaderBtn');
+const subtitleMode = document.getElementById('subtitleMode');
+const subtitleText = document.getElementById('subtitleText');
+const subtitlePlayBtn = document.getElementById('subtitlePlayBtn');
+const subtitleSeek = document.getElementById('subtitleSeek');
+const subtitleTime = document.getElementById('subtitleTime');
+const subtitleSpeed = document.getElementById('subtitleSpeed');
+const closeSubtitle = document.getElementById('closeSubtitle');
+const readerModeBtn = document.getElementById('readerModeBtn');
+const subtitleModeBtn = document.getElementById('subtitleModeBtn');
+
+// 1. 核心：获取有效时长兜底（防止 audio.duration 无限大卡死）
+function getValidDuration() {
+    if (audio.duration && Number.isFinite(audio.duration) && audio.duration > 0) {
+        return audio.duration;
+    }
+    if (subtitles && subtitles.length > 0) {
+        return subtitles[subtitles.length - 1].end;
+    }
+    return 0;
+}
+
+// 2. 初始化：抓取课程并读取历史记忆
+async function initCoursesFromZip() {
+    try {
+        const res = await fetch('/api/courses');
+        coursesList = await res.json();
+
+        courseSelect.innerHTML = '';
+        if (!coursesList || coursesList.length === 0) {
+            courseSelect.innerHTML = '<option value="">未找到 ZIP 课程包</option>';
+            statusEl.textContent = '未检索到 ZIP 课程';
+            return;
+        }
+
+        coursesList.forEach((course, i) => {
+            const option = document.createElement('option');
+            option.value = i;
+            option.textContent = course.title;
+            courseSelect.appendChild(option);
+        });
+
+        statusEl.textContent = `自动调入 ${coursesList.length} 个 ZIP 课程包`;
+        emptyEl.textContent = '选择上面的课程，自动加载';
+
+        // 读取上次记忆的课程索引
+        const savedIndex = localStorage.getItem('lastSelectedCourse');
+        if (savedIndex !== null && coursesList[savedIndex]) {
+            courseSelect.value = savedIndex;
+        } else {
+            courseSelect.value = 0;
+        }
+
+        // 自动加载当前课
+        loadCourse();
+
+    } catch (err) {
+        console.error('获取课程失败:', err);
+        statusEl.textContent = '服务器通信失败';
+    }
+}
+
+// 3. 加载课程主逻辑
+async function loadCourse() {
+    const idx = courseSelect.value;
+    if (idx === '' || !coursesList[idx]) return;
+    
+    // 记住当前选择
+    localStorage.setItem('lastSelectedCourse', idx);
+    const course = coursesList[idx];
+
+    // 设置音频源
+    audio.src = course.audio;
+    audio.load();
+
+    // 异步请求 ZIP 内部的 SRT
+    try {
+        const srtRes = await fetch(course.srt);
+        if (!srtRes.ok) throw new Error('SRT 丢失');
+        const srtText = await srtRes.text();
+        subtitles = parseSRT(srtText);
+    } catch (e) {
+        alert('读取 ZIP 内部 SRT 失败！');
+        return;
+    }
+
+    // 异步请求 TXT 文本
+    let lines = [];
+    let courseTitle = course.title;
+    try {
+        const txtRes = await fetch(course.txt);
+        if (txtRes.ok) {
+            const txt = await txtRes.text();
+            lines = txt.split(/\r?\n/).map(x => x.trim()).filter(Boolean);
+            if (lines.length) courseTitle = lines[0];
+        } else {
+            lines = subtitles.map(s => s.text);
+        }
+    } catch (e) {
+        lines = subtitles.map(s => s.text);
+    }
+
+    renderArticle(lines, courseTitle);
+    titleEl.textContent = courseTitle;
+    emptyEl.style.display = 'none';
+    
+    // 强制解锁所有控件
+    playBtn.disabled = false;
+    seek.disabled = false;
+    
+    statusEl.textContent = `${course.title} · ${subtitles.length} 条时间轴`;
+    currentIndex = -1;
+    updateHighlight(-1);
+    updateSubtitle(-1);
+    updateTime(); // 立即刷新一次时间显示
+}
+
+// 下拉框切换事件（只绑定一次！）
+courseSelect.addEventListener('change', loadCourse);
+loadBtn.addEventListener('click', loadCourse);
+
+function parseSRT(text) {
+    const blocks = text.replace(/^\uFEFF/, '').trim().split(/\r?\n\s*\r?\n/);
+    const result = [];
+    for (const block of blocks) {
+        const lines = block.split(/\r?\n/);
+        const timeLineIndex = lines.findIndex(x => x.includes('-->'));
+        if (timeLineIndex < 0) continue;
+        const times = lines[timeLineIndex].split('-->');
+        if (times.length !== 2) continue;
+        const start = parseSrtTime(times[0].trim());
+        const end = parseSrtTime(times[1].trim());
+        const textLines = lines.slice(timeLineIndex + 1);
+        const textStr = textLines.join(' ').trim();
+        if (Number.isFinite(start) && Number.isFinite(end) && textStr) {
+            result.push({ start, end, text: textStr });
+        }
+    }
+    return result;
+}
+
+function parseSrtTime(value) {
+    const m = value.match(/(\d+):(\d+):(\d+)[,.](\d+)/);
+    if (!m) return NaN;
+    return (Number(m[1]) * 3600 + Number(m[2]) * 60 + Number(m[3]) + Number(m[4]) / 1000);
+}
+
+function renderArticle(lines, courseTitle) {
+    article.innerHTML = '';
+    let body = lines;
+    if (lines.length && lines[0] === courseTitle) {
+        body = lines.slice(1);
+    }
+    const offset = subtitles.length === body.length + 1 ? 1 : 0;
+    body.forEach((line, index) => {
+        const p = document.createElement('p');
+        p.textContent = line;
+        p.dataset.subtitleIndex = index + offset;
+        p.addEventListener('click', () => {
+            const sub = subtitles[Number(p.dataset.subtitleIndex)];
+            if (!sub) return;
+            audio.currentTime = sub.start;
+            audio.play();
+        });
+        article.appendChild(p);
+    });
+}
+
+// 音频播放时间更新监听
+audio.addEventListener('timeupdate', () => {
+    if (!subtitles.length) return;
+    const t = audio.currentTime;
+    let index = subtitles.findIndex(s => t >= s.start && t < s.end);
+    if (index < 0) {
+        for (let i = subtitles.length - 1; i >= 0; i--) {
+            if (t >= subtitles[i].start) {
+                index = i;
+                break;
+            }
+        }
+    }
+    if (index !== currentIndex) {
+        currentIndex = index;
+        updateHighlight(index);
+        updateSubtitle(index);
+    }
+    updateTime();
+    updateSubtitleTime();
+});
+
+function updateHighlight(index) {
+    document.querySelectorAll('.article p.current').forEach(p => p.classList.remove('current'));
+    if (index < 0) return;
+    const p = document.querySelector(`.article p[data-subtitle-index="${index}"]`);
+    if (!p) return;
+    p.classList.add('current');
+    if (!subtitleModeActive) {
+        p.scrollIntoView({ behavior: 'smooth', block: 'center' });
+    }
+}
+
+function updateSubtitle(index) {
+    if (!subtitles.length) {
+        subtitleText.textContent = '选择课程后开始播放';
+        return;
+    }
+    if (index < 0 || !subtitles[index]) {
+        subtitleText.textContent = '▶ 开始播放';
+        return;
+    }
+    const text = subtitles[index].text;
+    subtitleText.classList.add('fade');
+    setTimeout(() => {
+        subtitleText.textContent = text;
+        subtitleText.classList.remove('fade');
+    }, 80);
+}
+
+playBtn.addEventListener('click', () => {
+    if (audio.paused) audio.play();
+    else audio.pause();
+});
+
+// 快进快退 5 秒
+function seekBy(seconds) {
+    audio.currentTime = Math.max(0, Math.min(getValidDuration(), audio.currentTime + seconds));
+}
+
+rewindBtn.addEventListener('click', () => seekBy(-5));
+forwardBtn.addEventListener('click', () => seekBy(5));
+repeatBtn.addEventListener('click', () => {
+    const sub = subtitles[currentIndex];
+    if (sub) audio.currentTime = sub.start;
+    audio.play();
+});
+
+subtitleDockBtn.addEventListener('click', enterSubtitleMode);
+exitReaderBtn.addEventListener('click', () => {
+    audio.pause();
+    window.scrollTo({ top: 0, behavior: 'smooth' });
+});
+
+audio.addEventListener('play', () => {
+    playBtn.textContent = '⏸';
+    subtitlePlayBtn.textContent = '⏸';
+});
+
+audio.addEventListener('pause', () => {
+    playBtn.textContent = '▶';
+    subtitlePlayBtn.textContent = '▶';
+});
+
+audio.addEventListener('loadedmetadata', () => {
+    seek.disabled = false;
+    seek.max = 1000;
+    subtitleSeek.max = 1000;
+    updateTime();
+    updateSubtitleTime();
+});
+
+audio.addEventListener('ended', () => {
+    playBtn.textContent = '▶';
+    subtitlePlayBtn.textContent = '▶';
+});
+
+// 进度条拖动事件
+seek.addEventListener('input', () => {
+    const d = getValidDuration();
+    if (!d) return;
+    audio.currentTime = (Number(seek.value) / 1000) * d;
+    updateTime();
+});
+
+subtitleSeek.addEventListener('input', () => {
+    const d = getValidDuration();
+    if (!d) return;
+    audio.currentTime = (Number(subtitleSeek.value) / 1000) * d;
+    updateTime();
+    updateSubtitleTime();
+});
+
+speedEl.addEventListener('change', () => {
+    audio.playbackRate = Number(speedEl.value);
+    subtitleSpeed.value = speedEl.value;
+});
+
+subtitleSpeed.addEventListener('change', () => {
+    audio.playbackRate = Number(subtitleSpeed.value);
+    speedEl.value = subtitleSpeed.value;
+});
+
+subtitlePlayBtn.addEventListener('click', () => {
+    if (audio.paused) audio.play();
+    else audio.pause();
+});
+
+function updateTime() {
+    const current = audio.currentTime || 0;
+    const duration = getValidDuration();
+    if (duration > 0) {
+        seek.value = Math.round((current / duration) * 1000);
+        seek.style.setProperty('--progress', `${seek.value / 10}%`);
+    }
+    timeEl.textContent = `${formatTime(current)} / ${formatTime(duration)}`;
+}
+
+function updateSubtitleTime() {
+    const current = audio.currentTime || 0;
+    const duration = getValidDuration();
+    if (duration > 0) {
+        subtitleSeek.value = Math.round((current / duration) * 1000);
+    }
+    subtitleTime.textContent = `${formatTime(current)} / ${formatTime(duration)}`;
+}
+
+function formatTime(seconds) {
+    if (!Number.isFinite(seconds)) return '00:00';
+    const s = Math.floor(seconds);
+    const m = Math.floor(s / 60);
+    const sec = s % 60;
+    return (String(m).padStart(2, '0') + ':' + String(sec).padStart(2, '0'));
+}
+
+subtitleModeBtn.addEventListener('click', enterSubtitleMode);
+function enterSubtitleMode() {
+    subtitleModeActive = true;
+    subtitleMode.style.display = 'block';
+    document.body.classList.add('subtitle-active');
+    readerModeBtn.classList.remove('active');
+    subtitleModeBtn.classList.add('active');
+    updateSubtitle(currentIndex);
+}
+
+readerModeBtn.addEventListener('click', exitSubtitleMode);
+closeSubtitle.addEventListener('click', exitSubtitleMode);
+function exitSubtitleMode() {
+    subtitleModeActive = false;
+    subtitleMode.style.display = 'none';
+    document.body.classList.remove('subtitle-active');
+    subtitleModeBtn.classList.remove('active');
+    readerModeBtn.classList.add('active');
+}
+
+async function toggleFullscreen() {
+    try {
+        if (!document.fullscreenElement) {
+            await document.documentElement.requestFullscreen();
+        } else {
+            await document.exitFullscreen();
+        }
+    } catch (e) {
+        console.log('Fullscreen error:', e);
+    }
+}
+
+document.addEventListener('keydown', function(e) {
+    if (e.key.toLowerCase() === 'f') {
+        const el = document.activeElement;
+        const tag = el ? el.tagName : '';
+        if (tag !== 'INPUT' && tag !== 'TEXTAREA' && tag !== 'SELECT') {
+            e.preventDefault();
+            toggleFullscreen();
+        }
+        return;
+    }
+    if (e.key === 'Escape') {
+        if (subtitleModeActive) {
+            exitSubtitleMode();
+        }
+        return;
+    }
+    if (e.code !== 'Space') return;
+    const el = document.activeElement;
+    const tag = el ? el.tagName : '';
+    if (tag === 'INPUT' || tag === 'TEXTAREA' || tag === 'SELECT') {
+        return;
+    }
+    e.preventDefault();
+    e.stopPropagation();
+    if (audio.paused) {
+        audio.play();
+    } else {
+        audio.pause();
+    }
+}, true);
+
+// 页面加载完成后自动绑定 ZIP 课程
+window.addEventListener('DOMContentLoaded', initCoursesFromZip);
+</script>
+</body>
+</html>

@@ -1,0 +1,446 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>文章阅读器 - LingQ 风格 (集成 TTS)</title>
+    <style>
+        :root {
+            --bg-color: #fcfcfc;
+            --text-color: #2b2b2b;
+            --secondary-text: #8e8e93;
+            --border-color: #e5e7eb;
+        }
+
+        body {
+            background-color: var(--bg-color);
+            color: var(--text-color);
+            font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
+            margin: 0;
+            padding: 0;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            min-height: 100vh;
+        }
+
+        .toolbar {
+            position: sticky;
+            top: 0;
+            width: 100%;
+            background: rgba(255, 255, 255, 0.95);
+            backdrop-filter: blur(10px);
+            border-bottom: 1px solid var(--border-color);
+            padding: 12px 24px;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            box-sizing: border-box;
+            z-index: 100;
+        }
+
+        .toolbar-title {
+            font-weight: 600;
+            font-size: 16px;
+            color: #4b5563;
+        }
+
+        .controls {
+            display: flex;
+            gap: 10px;
+            align-items: center;
+        }
+
+        .btn, .select-input {
+            background-color: #f3f4f6;
+            border: 1px solid #d1d5db;
+            color: #374151;
+            padding: 6px 12px;
+            border-radius: 6px;
+            cursor: pointer;
+            font-size: 14px;
+            transition: all 0.2s ease;
+        }
+
+        .btn:hover {
+            background-color: #e5e7eb;
+        }
+
+        .btn-tts {
+            background-color: #059669;
+            color: white;
+            border: none;
+            font-weight: 500;
+        }
+
+        .btn-tts:hover {
+            background-color: #047857;
+        }
+
+        .btn-tts:disabled {
+            background-color: #9ca3af;
+            cursor: not-allowed;
+        }
+
+        .file-input {
+            display: none;
+        }
+
+        .article-container {
+            width: 100%;
+            max-width: 720px;
+            margin: 40px auto 100px auto;
+            padding: 0 24px;
+            box-sizing: border-box;
+        }
+
+        .article-title {
+            font-size: 32px;
+            font-weight: 700;
+            color: var(--secondary-text);
+            margin-bottom: 40px;
+            line-height: 1.3;
+        }
+
+        .article-content p {
+            font-size: 26px;
+            line-height: 1.8;
+            font-weight: 400;
+            margin-bottom: 28px;
+            color: var(--text-color);
+            letter-spacing: 0.2px;
+            word-wrap: break-word;
+        }
+
+        .input-area {
+            width: 100%;
+            height: 200px;
+            margin-top: 10px;
+            padding: 12px;
+            border: 1px solid #cbd5e1;
+            border-radius: 8px;
+            font-size: 16px;
+            box-sizing: border-box;
+            resize: vertical;
+        }
+    </style>
+</head>
+<body>
+
+    <div class="toolbar">
+        <div class="toolbar-title">📖 专注阅读器 (LingQ 风格 + TTS)</div>
+        <div class="controls">
+            <button class="btn" onclick="document.getElementById('txtFile').click()">📂 打开 TXT</button>
+            <input type="file" id="txtFile" class="file-input" accept=".txt" onchange="loadTxtFile(event)">
+            
+            <button class="btn" onclick="togglePasteArea()">✏️ 粘贴文本</button>
+            <button class="btn" onclick="downloadTxtFile()">📄 保存 TXT</button>
+
+            <!-- TTS 选项 -->
+            <select id="voiceSelect" class="select-input" onchange="saveVoicePreference()">
+                <option value="1" selected>Seraphina (多语言女声)</option>
+                <option value="2">Katja (经典德语女声)</option>
+                <option value="3">Amala (温柔德语女声)</option>
+                <option value="4">Conrad (标准德语男声)</option>
+                <option value="5">Killian (沉稳德语男声)</option>
+                <option value="6">Florian (多语言男声)</option>
+            </select>
+            <button id="ttsBtn" class="btn btn-tts" onclick="generateAndDownloadAudio()">🎙️ 生成 MP3 + SRT</button>
+
+            <button class="btn" onclick="changeFontSize(2)">A+</button>
+            <button class="btn" onclick="changeFontSize(-2)">A-</button>
+        </div>
+    </div>
+
+    <main class="article-container">
+        
+        <div id="pasteSection" style="display: none; margin-bottom: 30px;">
+            <textarea id="rawText" class="input-area" placeholder="在这里粘贴你的文章内容...（第一行会自动作为标题）"></textarea>
+            <div style="display: flex; gap: 10px; margin-top: 10px;">
+                <button class="btn" style="background-color: #2563eb; color: white;" onclick="renderPastedText()">渲染新文章</button>
+                <button class="btn" style="background-color: #ef4444; color: white;" onclick="clearAllText()">🗑️ 清空内容</button>
+            </div>
+        </div>
+
+        <div id="displayArea">
+            <h1 class="article-title" id="articleTitle">请选择或粘贴 TXT 文章</h1>
+            <div class="article-content" id="articleBody">
+                <p>点击上方“📂 打开 TXT”或“✏️ 粘贴文本”开始阅读。文本的第一行会自动提取作为标题。</p>
+            </div>
+        </div>
+
+    </main>
+
+    <script>
+        let currentFontSize = 26;
+        let currentRawText = "";
+        function getCourseId() {
+
+            const title = document
+                .getElementById('articleTitle')
+                .innerText
+                .trim();
+
+            const match = title.match(/^(\d+)\s*-\s*/);
+
+            if (!match) {
+                throw new Error(
+                    "无法识别课程编号，例如：01 - Markus ist ein Koch"
+                );
+            }
+
+            return match[1];
+        }       
+
+
+
+        function getCourseTitle() {
+
+            const title = document
+                .getElementById('articleTitle')
+                .innerText
+                .trim();
+
+            return title
+                .replace(/^\d+\s*-\s*/, '')
+                .trim();
+        }
+
+
+
+
+
+
+
+
+
+
+        
+
+        // 页面初始化：读取 LocalStorage 记忆的数据
+        window.addEventListener('DOMContentLoaded', () => {
+            const savedText = localStorage.getItem('lingq_reader_text');
+            if (savedText && savedText.trim() !== '') {
+                document.getElementById('rawText').value = savedText;
+                processAndRenderText("", savedText);
+            }
+
+            const savedVoice = localStorage.getItem('lingq_reader_voice');
+            if (savedVoice) {
+                document.getElementById('voiceSelect').value = savedVoice;
+            }
+        });
+
+        // 保存用户选中的发音人
+        function saveVoicePreference() {
+            const voiceKey = document.getElementById('voiceSelect').value;
+            localStorage.setItem('lingq_reader_voice', voiceKey);
+        }
+
+        // 一键清空缓存与文本
+        function clearAllText() {
+            if (confirm("确定要清空当前的文本吗？")) {
+                localStorage.removeItem('lingq_reader_text');
+                currentRawText = "";
+                document.getElementById('rawText').value = '';
+                document.getElementById('articleTitle').innerText = '请选择或粘贴 TXT 文章';
+                document.getElementById('articleBody').innerHTML = '<p>点击上方“📂 打开 TXT”或“✏️ 粘贴文本”开始阅读。文本的第一行会自动提取作为标题。</p>';
+                document.getElementById('pasteSection').style.display = 'none';
+            }
+        }
+
+        function loadTxtFile(event) {
+            const file = event.target.files[0];
+            if (!file) return;
+
+            const reader = new FileReader();
+            reader.onload = function(e) {
+                const text = e.target.result;
+                document.getElementById('rawText').value = text;
+                processAndRenderText(file.name.replace(/\.txt$/i, ''), text);
+                event.target.value = '';
+            };
+            reader.readAsText(file, 'UTF-8');
+        }
+
+        function togglePasteArea() {
+            const sec = document.getElementById('pasteSection');
+            sec.style.display = sec.style.display === 'none' ? 'block' : 'none';
+        }
+
+        function renderPastedText() {
+            const text = document.getElementById('rawText').value;
+            if (!text.trim()) return;
+            processAndRenderText("", text);
+            document.getElementById('pasteSection').style.display = 'none';
+        }
+
+        function processAndRenderText(defaultTitle, text) {
+            currentRawText = text;
+            
+            // 只要成功渲染，立刻将最新文本写入浏览器本地缓存
+            localStorage.setItem('lingq_reader_text', text);
+
+            const lines = text.split(/\r?\n/).map(l => l.trim()).filter(l => l !== '');
+
+            if (lines.length === 0) {
+                document.getElementById('articleTitle').innerText = '';
+                document.getElementById('articleBody').innerHTML = '<p>（文件内容为空）</p>';
+                return;
+            }
+
+            const autoTitle = lines[0];
+            document.getElementById('articleTitle').innerText = autoTitle;
+
+            const bodyLines = lines.slice(1);
+            const bodyDiv = document.getElementById('articleBody');
+            bodyDiv.innerHTML = '';
+
+            if (bodyLines.length === 0) {
+                return;
+            }
+
+            bodyLines.forEach(line => {
+                const p = document.createElement('p');
+                p.innerText = line;
+                p.style.fontSize = currentFontSize + 'px';
+                bodyDiv.appendChild(p);
+            });
+        }
+
+        function changeFontSize(delta) {
+            currentFontSize = Math.max(16, Math.min(48, currentFontSize + delta));
+            const pElements = document.querySelectorAll('.article-content p');
+            pElements.forEach(p => p.style.fontSize = currentFontSize + 'px');
+        }
+
+        // 保存 TXT 文件（限制 80 字符）
+        function downloadTxtFile() {
+            if (!currentRawText.trim()) {
+                alert("当前没有可下载的文本内容！");
+                return;
+            }
+
+            let title = document.getElementById('articleTitle').innerText.trim() || "article";
+            title = title.replace(/[\\/:*?"<>|]/g, "_").substring(0, 80);
+
+            const blob = new Blob([currentRawText], { type: 'text/plain;charset=utf-8' });
+            const downloadUrl = window.URL.createObjectURL(blob);
+            const a = document.createElement('a');
+            a.href = downloadUrl;
+            a.download = `${title}.txt`;
+
+            document.body.appendChild(a);
+            a.click();
+            a.remove();
+            window.URL.revokeObjectURL(downloadUrl);
+        }
+
+        async function generateAndDownloadAudio() {
+            if (!currentRawText.trim()) {
+                alert("请先载入或粘贴文章内容！");
+                return;
+            }
+
+            const ttsBtn = document.getElementById('ttsBtn');
+            const voiceKey = document.getElementById('voiceSelect').value;
+
+            let title = document.getElementById('articleTitle').innerText.trim() || "article";
+
+            title = title
+                .replace(/[\\/:*?"<>|]/g, "_")
+                .substring(0, 80);
+
+            ttsBtn.disabled = true;
+            ttsBtn.innerText = "⏳ 正在生成 MP3 + SRT...";
+
+            try {
+                const response = await fetch(
+                    'http://127.0.0.1:8000/tts',
+                    {
+                        method: 'POST',
+                        headers: {
+                            'Content-Type': 'application/json'
+                        },
+                        body: JSON.stringify({
+                            text: currentRawText,
+                            voice_key: voiceKey,
+                            title: title
+                        })
+                    }
+                );
+
+                if (!response.ok) {
+                    const errData = await response.json();
+                    throw new Error(
+                        errData.detail || "生成失败"
+                    );
+                }
+
+                // Python 返回的是 ZIP 套餐
+                const blob = await response.blob();
+
+                const downloadUrl =
+                    window.URL.createObjectURL(blob);
+
+                const a =
+                    document.createElement('a');
+
+                a.href = downloadUrl;
+
+                // 文件名：
+                // TXT标题_音色名.zip
+                const voiceNames = {
+                    "1": "Seraphina",
+                    "2": "Katja",
+                    "3": "Amala",
+                    "4": "Conrad",
+                    "5": "Killian",
+                    "6": "Florian"
+                };
+
+                const voiceTag =
+                    voiceNames[voiceKey] || "Unknown";
+
+                a.download =
+                    `${title}_${voiceTag}.zip`;
+
+                document.body.appendChild(a);
+
+                a.click();
+
+                a.remove();
+
+                window.URL.revokeObjectURL(
+                    downloadUrl
+                );
+
+                ttsBtn.innerText =
+                    "✅ 生成成功！";
+
+            } catch (err) {
+
+                alert(
+                    "生成失败，请确认本地 Python server.py 是否正常启动！\n\n" +
+                    "错误信息: " +
+                    err.message
+                );
+
+                ttsBtn.innerText =
+                    "🎙️ 生成 MP3 + SRT";
+
+            } finally {
+
+                setTimeout(() => {
+
+                    ttsBtn.disabled = false;
+
+                    ttsBtn.innerText =
+                        "🎙️ 生成 MP3 + SRT";
+
+                }, 3000);
+            }
+        }
+    </script>
+</body>
+</html>
