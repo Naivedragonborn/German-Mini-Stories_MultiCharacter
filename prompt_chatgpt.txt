@@ -1,0 +1,269 @@
+【项目：终极版德语生成器 / German Mini Stories MultiCharacter】
+
+项目根目录：
+C:\Users\L\Desktop\终极版德语生成器
+
+GitHub：
+Naivedragonborn/German-Mini-Stories_MultiCharacter
+
+============================================================
+一、当前项目目录结构
+============================================================
+
+终极版德语生成器/
+│
+├── Server3.py
+├── readme.md
+├── .gitignore
+│
+├── txt/
+│   └── 德语故事原文 TXT
+│
+├── audio/
+│   └── MP3 音频
+│
+├── subtitles/
+│   └── SRT 字幕
+│
+├── zip/
+│   └── MP3 + SRT 打包文件
+│
+└── web/
+    ├── audio_manager.html
+    └── lingq_style_reader.html
+
+
+目录用途：
+
+txt/        = 德语故事原文
+audio/      = 生成的 MP3
+subtitles/  = 生成的 SRT
+zip/        = MP3 + SRT 的 ZIP 下载包
+web/        = 前端 HTML
+Server3.py  = FastAPI + Edge TTS 后端
+
+
+============================================================
+二、Server3.py 当前架构
+============================================================
+
+使用：
+
+BASE_DIR = os.path.dirname(os.path.abspath(__file__))
+
+目录：
+
+WEB_DIR = BASE_DIR/web
+TXT_DIR = BASE_DIR/txt
+AUDIO_DIR = BASE_DIR/audio
+SUBTITLE_DIR = BASE_DIR/subtitles
+ZIP_DIR = BASE_DIR/zip
+
+FastAPI：
+
+/audio      → AUDIO_DIR
+/subtitles  → SUBTITLE_DIR
+/           → WEB_DIR
+
+/api/courses：
+扫描 audio/ 目录中的 MP3，
+然后寻找 subtitles/ 中对应的 SRT，
+返回：
+
+{
+    "title": "...",
+    "audio": "/audio/xxx.mp3",
+    "srt": "/subtitles/xxx.srt"
+}
+
+ZIP 输出到：
+
+zip/
+
+
+============================================================
+三、单人 TTS
+============================================================
+
+原有单人 TTS 功能必须保留。
+
+用户选择网页中的 Voice：
+
+Seraphina
+Katja
+Amala
+Conrad
+Killian
+Florian
+
+然后 Edge TTS 生成 MP3 + SRT。
+
+不要因为加入多人 TTS 而删除、简化或重写原来的单人 TTS。
+
+
+============================================================
+四、多人 TTS
+============================================================
+
+多人文本格式：
+
+Amala: Ich habe einen Hund.
+
+Conrad: Ich habe auch einen Hund.
+
+Florian: Mein Hund heißt Max.
+
+后端自动检测 Speaker:
+
+Amala:
+Conrad:
+Florian:
+
+然后根据 Speaker 名字直接映射 VOICE_MAP。
+
+当前 Voice：
+
+Seraphina
+→ de-DE-SeraphinaMultilingualNeural
+
+Katja
+→ de-DE-KatjaNeural
+
+Amala
+→ de-DE-AmalaNeural
+
+Conrad
+→ de-DE-ConradNeural
+
+Killian
+→ de-DE-KillianNeural
+
+Florian
+→ de-DE-FlorianMultilingualNeural
+
+
+例如：
+
+Amala: ...
+→ Amala voice
+
+Conrad: ...
+→ Conrad voice
+
+Florian: ...
+→ Florian voice
+
+
+多人 TTS 工作流程：
+
+TXT
+↓
+识别 Speaker
+↓
+按句子拆分
+↓
+每句话使用对应 Speaker 的 Voice
+↓
+逐句生成 MP3
+↓
+按照原始文本顺序合并
+↓
+得到一个完整 MP3
+↓
+根据真实 MP3 时长生成 SRT
+
+
+多人 SRT 保留：
+
+Amala: ...
+Conrad: ...
+Florian: ...
+
+
+如果 Speaker 名字没有在 VOICE_MAP 中找到：
+
+使用网页选择的默认 Voice。
+
+============================================================
+五、重要设计原则
+============================================================
+
+以后修改这个项目：
+
+1. 不要重写整个 Server3.py。
+2. 不要为了优化而删除原有功能。
+3. 不要擅自简化现有代码。
+4. 只做增量修改。
+5. 如果需要改代码，必须明确告诉我：
+   - 改哪里
+   - 原来是什么
+   - 改成什么
+   - 是“修改”还是“新增”
+6. 如果可以只改后端，就不要动前端。
+7. 前端下载按钮已经可以正常工作。
+8. 多人 TTS 不需要增加新的下载按钮。
+9. Speaker 使用现有 Voice 名字，不使用 Anna / Markus 这种额外人物名。
+10. 生成的 MP3、SRT、ZIP 必须按照当前目录结构保存。
+
+
+============================================================
+六、当前项目核心目标
+============================================================
+
+这是一个个人德语学习用的 German Mini Stories 生成器。
+
+主要功能：
+
+德语故事
+↓
+TXT
+↓
+LingQ 风格网页阅读器
+↓
+Edge TTS
+↓
+MP3
+↓
+SRT
+↓
+网页播放 / 字幕同步
+↓
+ZIP 下载
+
+
+现在已经支持：
+
+单人德语故事
+
+以及：
+
+多人德语对话故事
+
+多人故事可以让不同人物使用不同德语 TTS 声音，
+最后合并成一个完整 MP3。
+
+
+============================================================
+七、以后和 ChatGPT 沟通规则
+============================================================
+
+当我说：
+
+“继续改终极版德语生成器”
+
+默认直接基于以上项目状态继续。
+
+不要让我重新解释目录结构。
+
+不要重新设计项目。
+
+如果我贴出代码：
+
+先判断我当前代码和上述架构哪里不同，
+然后只告诉我需要改的具体位置。
+
+如果需要完整代码，
+只有我明确说“发完整 Server3.py”
+时才发完整文件。
+
+否则优先告诉我精确修改位置。

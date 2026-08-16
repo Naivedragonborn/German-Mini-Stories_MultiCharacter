@@ -8,6 +8,28 @@ import uvicorn
 import shutil
 import subprocess
 
+
+# ============================================================
+# 项目目录
+# ============================================================
+
+BASE_DIR = os.path.dirname(
+    os.path.abspath(__file__)
+)
+
+WEB_DIR = os.path.join(BASE_DIR, "web")
+TXT_DIR = os.path.join(BASE_DIR, "txt")
+AUDIO_DIR = os.path.join(BASE_DIR, "audio")
+SUBTITLE_DIR = os.path.join(BASE_DIR, "subtitles")
+ZIP_DIR = os.path.join(BASE_DIR, "zip")
+
+os.makedirs(WEB_DIR, exist_ok=True)
+os.makedirs(TXT_DIR, exist_ok=True)
+os.makedirs(AUDIO_DIR, exist_ok=True)
+os.makedirs(SUBTITLE_DIR, exist_ok=True)
+os.makedirs(ZIP_DIR, exist_ok=True)
+
+
 from fastapi import FastAPI, HTTPException
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import FileResponse
@@ -461,7 +483,8 @@ def parse_multispeaker_text(text):
         else:
 
             # 没有新的 Speaker
-            # 默认继续属于上一位
+            # 如果前面已经有 Speaker，
+            # 当前行继续属于上一位
             if current_speaker:
 
                 current_text.append(
@@ -470,7 +493,8 @@ def parse_multispeaker_text(text):
 
             else:
 
-                return None
+                # Speaker 之前的普通文本、标题直接忽略
+                continue
 
     # 最后一位 Speaker
     if (
@@ -1114,7 +1138,7 @@ async def tts_endpoint(
     )
 
     output_zip = os.path.join(
-        temp_dir,
+        ZIP_DIR,
         f"{base_name}.zip"
     )
 
@@ -1226,12 +1250,12 @@ async def tts_endpoint(
     # ========================================================
 
     root_mp3 = os.path.join(
-        ".",
+        AUDIO_DIR,
         f"{base_name}.mp3"
     )
 
     root_srt = os.path.join(
-        ".",
+        SUBTITLE_DIR,
         f"{base_name}.srt"
     )
 
@@ -1297,7 +1321,7 @@ async def tts_endpoint(
 @app.get("/api/courses")
 async def list_courses():
 
-    files = os.listdir(".")
+    files = os.listdir(AUDIO_DIR)
 
     mp3_files = [
         f
@@ -1340,7 +1364,7 @@ async def list_courses():
 
         if not os.path.exists(
             os.path.join(
-                ".",
+                SUBTITLE_DIR,
                 srt_name
             )
         ):
@@ -1350,8 +1374,8 @@ async def list_courses():
         courses.append(
             {
                 "title": clean_title,
-                "audio": f"/{base_name}.mp3",
-                "srt": f"/{base_name}.srt"
+                "audio": f"/audio/{base_name}.mp3",
+                "srt": f"/subtitles/{base_name}.srt"
             }
         )
 
@@ -1361,11 +1385,25 @@ async def list_courses():
 # ============================================================
 # 静态网页
 # ============================================================
+app.mount(
+    "/audio",
+    StaticFiles(
+        directory=AUDIO_DIR
+    ),
+    name="audio"
+)
 
+app.mount(
+    "/subtitles",
+    StaticFiles(
+        directory=SUBTITLE_DIR
+    ),
+    name="subtitles"
+)
 app.mount(
     "/",
     StaticFiles(
-        directory=".",
+        directory=WEB_DIR,
         html=True
     ),
     name="static"
